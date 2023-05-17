@@ -5,35 +5,30 @@ import threading
 
 # Función para generar un tablero de parejas
 def tableroparejas(n):
-    fichasunicas = (n*n)//2
-    tablero = np.zeros(shape=(n,n),dtype=int)
+    fichasunicas = (n * n) // 2
+    tablero = np.zeros(shape=(n, n), dtype=int)
     i = 1
     while i <= fichasunicas:
-        f1 = int(rnd.random()*n)
-        c1 = int(rnd.random()*n)
-        while not(tablero[f1,c1] == 0):
-            f1 = int(rnd.random()*n)
-            c1 = int(rnd.random()*n)
-        tablero[f1,c1] = i
-        f2 = int(rnd.random()*n)
-        c2 = int(rnd.random()*n)
-        while not(tablero[f2,c2] == 0):
-            f2 = int(rnd.random()*n)
-            c2 = int(rnd.random()*n)
-        tablero[f2,c2] = i
+        f1 = int(rnd.random() * n)
+        c1 = int(rnd.random() * n)
+        while not (tablero[f1, c1] == 0):
+            f1 = int(rnd.random() * n)
+            c1 = int(rnd.random() * n)
+        tablero[f1, c1] = i
+        f2 = int(rnd.random() * n)
+        c2 = int(rnd.random() * n)
+        while not (tablero[f2, c2] == 0):
+            f2 = int(rnd.random() * n)
+            c2 = int(rnd.random() * n)
+        tablero[f2, c2] = i
         i += 1
     return tablero
 
-def juego_de_memorama(conn, addr):
-    # Generar tablero de parejas
-    tablero = tableroparejas(4)
-
+def juego_de_memorama(conn, addr, tablero, encontrado_lock, descubiertas_cliente):
     # Enviar tablero de parejas al cliente
     tablero_serializado = tablero.tostring()
     conn.sendall(tablero_serializado)
 
-    # Inicializar matriz descubiertas
-    descubiertas = np.zeros(shape=(4, 4), dtype=int)
     encontrado = 0
     intentos_fallidos = 0
 
@@ -52,13 +47,14 @@ def juego_de_memorama(conn, addr):
         ficha2 = tablero[f2, c2]
 
         if ficha1 == ficha2:
-            descubiertas[f1, c1] = ficha1
-            descubiertas[f2, c2] = ficha2
-            encontrado += 2
+            with encontrado_lock:
+                descubiertas_cliente[f1, c1] = ficha1
+                descubiertas_cliente[f2, c2] = ficha2
+                encontrado += 2
             print("ENCONTRÓ una pareja..!", ficha1, ficha2)
 
             # Enviar respuesta al cliente (pareja encontrada)
-            response = "encontrado,{},{},{},{}".format(f1, c1, f2, c2).encode()
+            response = "encontrado".encode()
             conn.sendall(response)
         else:
             intentos_fallidos += 1
@@ -67,10 +63,6 @@ def juego_de_memorama(conn, addr):
             # Enviar respuesta al cliente (pareja no encontrada)
             response = "equivocado".encode()
             conn.sendall(response)
-
-        # Enviar estado actual del juego (descubierto o no) al cliente
-        estado_juego_serializado = descubiertas.tostring()
-        conn.sendall(estado_juego_serializado)
 
     # Verificar si se encontraron todas las parejas
     if encontrado == (4 * 4) // 2:
@@ -88,12 +80,16 @@ def juego_de_memorama(conn, addr):
     conn.close()
 
 def servirPorSiempre(socketTcp, listaconexiones):
+    tablero = tableroparejas(4)
+    encontrado_lock = threading.Lock()
+
     try:
         while True:
             client_conn, client_addr = socketTcp.accept()
             print("Conectado a", client_addr)
             listaconexiones.append(client_conn)
-            thread_game = threading.Thread(target=juego_de_memorama, args=[client_conn, client_addr])
+            descubiertas_cliente = np.zeros(shape=(4, 4), dtype=int)
+            thread_game = threading.Thread(target=juego_de_memorama, args=[client_conn, client_addr, tablero, encontrado_lock, descubiertas_cliente])
             thread_game.start()
             gestion_conexiones(listaconexiones)
     except Exception as e:
@@ -108,8 +104,8 @@ def gestion_conexiones(listaconexiones):
     print("conexiones: ", len(listaconexiones))
     print(listaconexiones)
 
-HOST = "x.x.x.x"  # Dirección de la interfaz de loopback estándar (localhost)
-PORT = 55041  # Puerto que usa el cliente  (los puertos sin provilegios son > 1023)
+HOST = "192.168.100.18"  # Dirección de la interfaz de loopback estándar (localhost)
+PORT = 55041  # Puerto que usa el cliente  (los puertos sin privilegios son > 1023)
 buffer_size = 1024
 
 listaConexiones = []
