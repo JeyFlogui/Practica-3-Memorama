@@ -8,7 +8,7 @@ def mostrar_tablero(tablero, descubiertas):
             if descubiertas[i, j] == 0:
                 print(" * ", end="")
             else:
-                print(" {} ".format(tablero[i, j]), end="")
+                print(" {} ".format(descubiertas[i, j]), end="")
         print()
 
 PORT = 55041
@@ -25,9 +25,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as TCPClientSocket:
     data = TCPClientSocket.recv(buffer_size)
     tablero = np.frombuffer(data, dtype=int).reshape((4, 4))
 
-    # Mostrar tablero de parejas al usuario
-    descubiertas = np.zeros(shape=(4, 4), dtype=int)
-    mostrar_tablero(tablero, descubiertas)
+    # Crear matriz de descubiertas del cliente
+    descubiertas_cliente = np.zeros(shape=(4, 4), dtype=int)
+
+    # Mostrar tablero vacío al usuario
+    mostrar_tablero(tablero, descubiertas_cliente)
 
     encontrado = 0
     while encontrado < (4 * 4) // 2:
@@ -50,9 +52,10 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as TCPClientSocket:
         if response.startswith("encontrado"):
             _, f1, c1, f2, c2 = response.split(",")
             f1, c1, f2, c2 = int(f1), int(c1), int(f2), int(c2)
-            descubiertas[f1, c1] = tablero[f1, c1]
-            descubiertas[f2, c2] = tablero[f2, c2]
+            descubiertas_cliente[f1, c1] = tablero[f1, c1]
+            descubiertas_cliente[f2, c2] = tablero[f2, c2]
             encontrado += 2
+            print("Encontraste una pareja: {} y {}".format(tablero[f1, c1], tablero[f2, c2]))
         elif response.startswith("equivocado"):
             print("Las fichas no coinciden")
         elif response.startswith("ganado"):
@@ -65,12 +68,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as TCPClientSocket:
             print("Respuesta no reconocida")
 
         # Mostrar estado del juego al usuario
-        mostrar_tablero(tablero, descubiertas)
-
-    # Recibir estado final del juego del servidor
-    data = TCPClientSocket.recv(buffer_size)
-    descubiertas = np.frombuffer(data, dtype=int).reshape((4, 4))
-    mostrar_tablero(tablero, descubiertas)
+        mostrar_tablero(tablero, descubiertas_cliente)
 
     # Cerrar conexión con el servidor
     TCPClientSocket.close()
